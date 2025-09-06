@@ -1,0 +1,77 @@
+services:
+  catalogdb:
+    container_name: catalogdb
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Your_password123
+      - POSTGRES_DB=CatalogDb
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_catlog:/var/lib/postgresql/data
+
+  basketdb:
+    container_name: basketdb
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Your_password123
+      - POSTGRES_DB=BasketDb
+    restart: always
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_basket:/var/lib/postgresql/data
+
+  distributedcache:
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  catalog.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - connectionstrings__marten=Host=catalogdb;Database=CatalogDb;Username=postgres;Password=Your_password123
+    ports:
+      - "6000:8080"
+     
+    depends_on:
+      - catalogdb
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro}
+
+  basket.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - connectionstrings__marten=Host=basketdb;Database=BasketDb;Username=postgres;Password=Your_password123
+      - connectionstrings__redis=distributedcache:6379
+      - GrpcSettings__DiscountUrl=http://discount.grpc:8080
+    ports:
+      - "6001:8080"
+    depends_on:
+      - distributedcache
+      - basketdb
+      - discount.grpc
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+      - ${APPDATA}/ASP.NET/Https:/root/.aspnet/https:ro
+
+  discount.grpc:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - connectionstrings__Database=Data source=/tmp/discountdb
+    ports:
+      - "6002:8080"
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+      - ${APPDATA}/ASP.NET/Https:/root/.aspnet/https:ro
+      #- discount_data:/app  # Mount to the working directory
